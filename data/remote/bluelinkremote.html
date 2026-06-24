@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<meta name="theme-color" content="#0b1730">
+<meta name="description" content="BlueLink Victron remote viewer">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" sizes="180x180" href="./icon-180.png">
+<link rel="icon" type="image/png" sizes="32x32" href="./icon-32.png">
+<title>BlueLink - Victron MPPT</title>
+<style>
+:root{--bg:#070e1a;--card:#0b1730;--card2:#081020;--border:#152850;--accent:#1b7ccc;--accent2:#3b9eff;--text:#c8d8f0;--muted:#5a7da0;--green:#3ecf5e;--yellow:#e6b800;--orange:#e67e00;--red:#e63946}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh;display:flex;flex-direction:column}
+header{background:var(--card);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 12px rgba(0,0,0,.4)}
+header h1{font-size:17px;font-weight:600;color:var(--accent2);letter-spacing:.5px}
+header .status{font-size:11px;padding:4px 10px;border-radius:10px;background:var(--card2);font-weight:500}
+.status.ok{color:var(--green)}.status.err{color:var(--red)}.status.warn{color:var(--orange)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.dot.green{background:var(--green);box-shadow:0 0 6px var(--green)}.dot.red{background:var(--red);box-shadow:0 0 6px var(--red)}.dot.yellow{background:var(--yellow)}
+main{flex:1;padding:10px;overflow-y:auto;padding-bottom:100px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:0 1px 6px rgba(0,0,0,.25)}
+.card-title{font-size:10px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;letter-spacing:1px;font-weight:500}
+.value{font-size:26px;font-weight:700;color:#eef4ff}
+.value.sm{font-size:19px}
+.value-unit{font-size:12px;font-weight:400;color:var(--muted);margin-left:3px}
+.row{display:flex;gap:10px}.col{flex:1}
+.flex-between{display:flex;justify-content:space-between;align-items:center}
+
+.gauge-container{display:flex;justify-content:center;align-items:center;margin:6px 0 42px;position:relative}
+.gauge{position:relative;width:150px;height:150px}
+.gauge svg{width:100%;height:100%;transform:rotate(-90deg)}
+.gauge-value{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center}
+.gauge-big{font-size:34px;font-weight:800;color:#eef4ff;letter-spacing:-1px;transition:all .4s ease}
+.gauge-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+.gauge-sub{font-size:11px;color:var(--muted);margin-top:1px}
+
+.cs-indicator{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:14px;font-size:12px;font-weight:600}
+.cs-bulk{background:rgba(230,126,0,.15);color:var(--orange)}.cs-absorption{background:rgba(230,184,0,.15);color:var(--yellow)}.cs-float{background:rgba(62,207,94,.15);color:var(--green)}.cs-off{background:rgba(90,125,160,.12);color:var(--muted)}.cs-fault{background:rgba(230,57,70,.15);color:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}.pulse{animation:pulse 2s ease-in-out infinite}
+
+.yield-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+nav.tabs{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--border);display:flex;z-index:10;box-shadow:0 -2px 12px rgba(0,0,0,.3)}
+nav.tabs button{flex:1;padding:12px 6px;background:0;border:0;color:var(--muted);font-size:11px;cursor:pointer;transition:color .2s;font-weight:500}
+nav.tabs button.active{color:var(--accent2);border-top:2px solid var(--accent2)}
+nav.tabs button svg{display:block;margin:0 auto 3px;width:18px;height:18px}
+.panel{display:none}.panel.active{display:block}
+
+.power-bar{height:3px;background:var(--card2);border-radius:2px;margin-top:4px;overflow:hidden}
+.power-bar-fill{height:100%;border-radius:2px;transition:width .5s ease;background:linear-gradient(90deg,#2a5a90,var(--accent2),#e6a800)}
+
+.form-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(21,40,80,.6)}
+.form-row:last-child{border-bottom:0}
+.form-label{font-size:12px;color:var(--muted)}.form-value{font-size:12px;color:var(--accent);font-weight:500}
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;padding:8px 18px;border-radius:8px;font-size:12px;z-index:20;opacity:0;transition:opacity .3s;box-shadow:0 4px 16px rgba(0,0,0,.4)}
+.toast.show{opacity:1}.toast.ok{background:var(--green)}.toast.err{background:var(--red)}.toast.warn{background:var(--orange)}
+
+@keyframes solarPulse{0%,100%{opacity:.7;transform:scale(1)}50%{opacity:1;transform:scale(1.05)}}
+@keyframes glowPulse{0%,100%{filter:drop-shadow(0 0 2px currentColor)}50%{filter:drop-shadow(0 0 8px currentColor)}}
+/* Alarm styles */
+.dot.alarm-blink{background:var(--red);box-shadow:0 0 10px var(--red);animation:alarmBlink .8s ease-in-out infinite}
+@keyframes alarmBlink{0%,100%{opacity:1}50%{opacity:.3}}
+.card.alarm-active{border-color:rgba(230,57,70,.4)}
+.card-title.alarm{color:var(--red)!important}
+.meter-label.alarm{color:var(--red)!important}
+.meter-card{padding:0;overflow:hidden;margin-bottom:10px}
+.meter-top{padding:10px 14px 6px}
+.meter-svg{height:80px;width:100%;display:block}
+.meter-label{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:600;margin-bottom:2px}
+.meter-value{font-family:'SF Mono',monospace;font-size:28px;font-weight:800;color:#fff;line-height:1;transition:opacity .4s ease}
+.meter-unit{font-size:11px;color:var(--muted);margin-left:4px;font-weight:400}
+.meter-bar{height:6px;background:var(--card2);border-radius:0 0 8px 8px;overflow:hidden}
+.meter-bar-fill{height:100%;border-radius:0 0 8px 8px;transition:width 1.2s cubic-bezier(.4,0,.2,1)}
+.meter-solar .meter-bar-fill{background:linear-gradient(90deg,#e6a800,#ff6b00)}
+.meter-batt .meter-bar-fill{background:linear-gradient(90deg,#3ecf5e,#00ff88)}
+.meter-load .meter-bar-fill{background:linear-gradient(90deg,#e63946,#ff6b6b)}
+.solar-rays{animation:solarPulse 2s ease-in-out infinite;animation-play-state:paused;transition:opacity .6s ease}
+.solar-rays.active{animation-play-state:running}
+.charge-glow{animation:glowPulse 2s ease-in-out infinite}
+.gauge-big{transition:transform .5s ease,color .3s ease}
+.meter-svg rect{transition:width 1s cubic-bezier(.4,0,.2,1)}
+
+#debugLog{position:fixed;top:0;left:0;right:0;background:rgba(7,14,26,.97);border-bottom:1px solid var(--border);padding:8px 12px;font-size:10px;color:var(--muted);z-index:30;max-height:120px;overflow-y:auto;font-family:monospace;display:none;line-height:1.4}
+#debugLog.show{display:block}
+#debugLog b{color:var(--accent2)}#debugLog .err{color:var(--red)}#debugLog .ok{color:var(--green)}
+</style>
+</head>
+<body>
+<div id="debugLog"></div>
+<header><h1><span id="connDot" class="dot red"></span>BlueLink</h1><div style="display:flex;align-items:center;gap:8px"><button id="rvMuteBtn" onclick="toggleRvMute()" style="background:0;border:0;color:var(--yellow);font-size:18px;cursor:pointer;padding:2px" title="Alarm geluid">🔔</button><span id="status" class="status err">Offline</span></div></header>
+<main>
+
+<div id="panel-dash" class="panel active">
+<div class="gauge-container"><div class="gauge"><svg viewBox="0 0 150 150"><defs><linearGradient id="gr" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#2a5a90"/><stop offset="40%" stop-color="#3b9eff"/><stop offset="100%" stop-color="#e6a800"/></linearGradient></defs><circle cx="75" cy="75" r="66" fill="none" stroke="#081020" stroke-width="8"/><circle id="ring" cx="75" cy="75" r="66" fill="none" stroke="url(#gr)" stroke-width="8" stroke-linecap="round" stroke-dasharray="0 415"/></svg><div class="gauge-value"><div class="gauge-big" id="pvW">--</div><div class="gauge-label">Watt</div></div></div></div>
+
+<div class="card meter-card meter-solar">
+<div class="meter-top">
+<div class="meter-label">☀️ ZONNEPANEEL</div>
+<div style="display:flex;align-items:baseline;justify-content:space-between">
+<div><span class="meter-value" id="pvV">--</span><span class="meter-unit">V</span></div>
+<div><span class="meter-value" id="pvA">--</span><span class="meter-unit">A</span></div>
+</div>
+</div>
+</div>
+
+<div class="card meter-card meter-batt">
+<div class="meter-top">
+<div class="meter-label">🔋 BATTERIJ</div>
+<div style="display:flex;align-items:baseline;justify-content:space-between">
+<div><span class="meter-value" id="batV">--</span><span class="meter-unit">V</span></div>
+<div><span class="meter-value" id="batA">--</span><span class="meter-unit">A</span></div>
+</div>
+</div>
+<svg class="meter-svg" viewBox="0 0 300 100" preserveAspectRatio="none">
+<defs><linearGradient id="battGrad" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#e63946"/><stop offset="30%" stop-color="#e6a800"/><stop offset="70%" stop-color="#3ecf5e"/><stop offset="100%" stop-color="#00ff88"/></linearGradient><mask id="battMask"><rect x="44" y="18" width="212" height="34" fill="white"/><text x="150" y="42" fill="black" font-size="18" font-weight="800" text-anchor="middle" id="maskText">0%</text></mask></defs>
+<rect x="40" y="14" width="220" height="42" rx="6" fill="#0a1525" stroke="#1a3a5c" stroke-width="2"/>
+<rect x="44" y="18" width="0" height="34" rx="4" fill="url(#battGrad)" id="battMeterFill" mask="url(#battMask)"/>
+<rect x="262" y="25" width="8" height="20" rx="2" fill="#1a3a5c"/>
+</svg>
+</div>
+
+<div class="row">
+<div class="col card"><div class="card-title"><span class="charge-glow">📊</span> Laadstatus</div><span class="cs-indicator cs-off pulse" id="csBadge" style="margin-top:8px;display:inline-block">Off</span></div>
+<div class="col card"><div class="card-title">🎯 MPPT Tracker</div><span class="cs-indicator cs-off" id="mpptBadge" style="margin-top:8px;display:inline-block">--</span></div>
+</div>
+
+<div class="card meter-card meter-load">
+<div class="meter-top">
+<div class="meter-label">💡 LOAD OUTPUT</div>
+<div class="flex-between" style="margin-top:2px"><span id="loadBadge" style="font-size:14px;font-weight:700">--</span></div>
+</div>
+</div>
+
+<div class="yield-grid"><div class="card" style="margin:0"><div class="card-title">📅 Opbrengst vandaag</div><div class="value sm" id="yToday">-- <span class="value-unit">kWh</span></div></div><div class="card" style="margin:0"><div class="card-title">🏆 Totaal</div><div class="value sm" id="yTotal">-- <span class="value-unit">kWh</span></div></div></div>
+<!-- SLAVE DEVICE (Inverter) -- hidden by default -->
+<div id="slaveSection" style="display:none;margin-top:10px;border-top:1px dashed var(--border);padding-top:10px">
+<div class="card-title" style="color:var(--accent2);margin-bottom:8px">🔌 SLAVE: <span id="slaveModel">--</span></div>
+<div class="row">
+<div class="col card"><div class="card-title">⚡ AC OUTPUT</div><div class="value sm" id="slaveAcV">--<span class="value-unit"> V</span></div></div>
+<div class="col card"><div class="card-title">💡 AC CURRENT</div><div class="value sm" id="slaveAcA">--<span class="value-unit"> A</span></div></div>
+</div>
+<div class="row">
+<div class="col card"><div class="card-title">🔋 DC INPUT</div><div class="value sm" id="slaveDcV">--<span class="value-unit"> V</span></div></div>
+<div class="col card"><div class="card-title">📊 DC CURRENT</div><div class="value sm" id="slaveDcA">--<span class="value-unit"> A</span></div></div>
+</div>
+<div class="row">
+<div class="col card"><div class="card-title">📈 POWER</div><div class="value sm" id="slavePw">--<span class="value-unit"> W</span></div></div>
+<div class="col card"><div class="card-title">🎯 STATUS</div><span class="cs-indicator cs-off" id="slaveCs">Off</span></div>
+</div>
+</div>
+
+<div style="text-align:center;padding:6px;font-size:10px;color:var(--muted);background:var(--card2);border-radius:8px;margin-top:8px" id="lastUpdate">Wachten op data...</div>
+</div>
+
+<div id="panel-hist" class="panel">
+<div class="card" style="text-align:center;padding:40px 20px">
+<div style="font-size:40px;margin-bottom:10px">&#128202;</div>
+<div style="color:var(--muted);font-size:13px">Historische grafieken zijn alleen lokaal beschikbaar via de BlueLink WiFi.</div>
+<div style="color:var(--accent);font-size:12px;margin-top:6px">Verbind met BlueLink WiFi &amp; ga naar 192.168.4.1</div>
+</div>
+</div>
+
+<div id="panel-device" class="panel">
+<div class="card"><div class="card-title">Apparaat informatie</div>
+<div class="form-row"><span class="form-label">Product ID</span><span class="form-value" id="devPid">--</span></div>
+<div class="form-row"><span class="form-label">Model</span><span class="form-value" id="devModel">--</span></div>
+<div class="form-row"><span class="form-label">Firmware</span><span class="form-value" id="devFw">--</span></div>
+<div class="form-row"><span class="form-label">Serienummer</span><span class="form-value" id="devSer">--</span></div>
+<div class="form-row"><span class="form-label">Dagen sinds vol</span><span class="form-value" id="devHsds">--</span></div>
+<div class="form-row"><span class="form-label">BlueLink uptime</span><span class="form-value" id="devUptime">--</span></div>
+</div>
+</div>
+
+<div id="panel-settings" class="panel">
+<div class="card"><div class="card-title">📡 MQTT kijk-instellingen</div>
+<p style="font-size:11px;color:var(--muted);margin:0 0 8px 0;line-height:1.4">
+  Deze instellingen moeten overeenkomen met wat je in de lokale BlueLink Web UI ziet (Settings → MQTT). Gebruik het unieke topic dat automatisch bij jouw Wemos hoort; niet het gedeelde <code>bluelink/data</code> topic.</p>
+<div class="form-row"><span class="form-label">Broker</span><span><input type="text" id="rvBroker" value="broker.hivemq.com" style="width:140px"></span></div>
+<div class="form-row"><span class="form-label">Topic</span><span><input type="text" id="rvTopic" placeholder="bluelink/data/XXXX" style="width:140px"></span></div>
+<div class="form-row"><span class="form-label">WebSocket port</span><span><input type="number" id="rvWssPort" value="8884" style="width:70px"></span></div>
+<div style="display:flex;gap:6px;margin-top:8px">
+  <button class="btn" onclick="reconnectMqtt()">Verbinden</button>
+  <button class="btn" onclick="resetRvMqttDefaults()">Reset default</button>
+</div>
+<p id="rvMqttCurrent" style="font-size:11px;color:var(--muted);margin-top:8px;margin-bottom:0">Huidig: --</p>
+</div>
+</div>
+</div>
+</main>
+
+<nav class="tabs">
+<button class="active" onclick="switchTab('dash')">
+<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>Dashboard
+</button>
+<button onclick="switchTab('hist')">
+<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>Historie
+</button>
+<button onclick="switchTab('device')">
+<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>Device
+</button>
+<button onclick="switchTab('settings')">
+<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5zm7.43-2.53c.04-.32.07-.64.07-.97s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65c-.04-.24-.25-.42-.5-.42h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.13-.22.07-.49-.12-.64l-2.11-1.65z"/></svg>Settings
+</button>
+</nav>
+<div class="toast" id="toast"></div>
+
+<script src="./mqtt.min.js"></script>
+<script>
+function log(m,cls){
+  var el=document.getElementById('debugLog');
+  var t=new Date().toLocaleTimeString('nl-NL',{hour12:false})+' ';
+  var c=cls?' class="'+cls+'"':'';
+  el.innerHTML='<div'+c+'>'+t+m+'</div>'+el.innerHTML;
+  if(el.innerHTML.length>3000)el.innerHTML=el.innerHTML.substring(0,3000);
+  while(el.children.length>40)el.removeChild(el.lastChild);
+}
+
+var rvBroker='broker.hivemq.com', rvTopic='', rvWssPort='8884';
+// Read broker/topic/port from URL query parameters or localStorage.
+function blStore(key, value){
+  try { localStorage.setItem(key, value); } catch (e) { log('Opslag niet beschikbaar', 'err'); }
+}
+function blLoad(key, fallback){
+  try { return localStorage.getItem(key) || fallback; } catch (e) { return fallback; }
+}
+(function(){
+  var p=new URLSearchParams(window.location.search);
+  var fromUrl=false;
+  if(p.has('broker')){ rvBroker=p.get('broker'); blStore('bluelink.broker', rvBroker); fromUrl=true; }
+  if(p.has('topic')){ rvTopic=p.get('topic'); blStore('bluelink.topic', rvTopic); fromUrl=true; }
+  if(p.has('port')){ rvWssPort=p.get('port'); blStore('bluelink.port', rvWssPort); fromUrl=true; }
+  if(!fromUrl){
+    rvBroker = blLoad('bluelink.broker', rvBroker);
+    rvTopic  = blLoad('bluelink.topic', rvTopic);
+    rvWssPort= blLoad('bluelink.port', rvWssPort);
+  }
+})();
+function makeMqttClient(){
+  var url='wss://'+rvBroker+':'+rvWssPort+'/mqtt';
+  return mqtt.connect(url,{
+    clientId: 'bluelink-remote-' + Math.random().toString(16).substr(2, 8),
+    reconnectPeriod: 5000,
+    connectTimeout: 10 * 1000,
+    clean: true
+  });
+}
+var client=makeMqttClient();
+var liveData={};
+var lastUpdateMs=0;   // 0 = no data seen yet
+var msgCount=0;
+var rvMuted=false;
+
+attachMqttHandlers();
+
+function attachMqttHandlers(){
+  if(!client) return;
+client.on('connect',function(){
+  log('MQTT verbonden', 'ok');
+  if(!rvTopic){
+    log('Geen MQTT topic ingesteld. Open de viewer via de Wemos Web UI (QR of launcher).', 'err');
+    document.getElementById('status').textContent='Geen topic';
+    document.getElementById('status').className='status err';
+    document.getElementById('connDot').className='dot red';
+    return;
+  }
+  log('Broker: '+rvBroker+':'+rvWssPort+' topic: '+rvTopic);
+  document.getElementById('status').textContent='Wachten op data...';
+  document.getElementById('status').className='status warn';
+  document.getElementById('connDot').className='dot yellow';
+  client.subscribe(rvTopic,function(err){
+    if(err){log('Subscribe fout: '+err.message,'err');}
+    else{log('Geabonneerd op '+rvTopic,'ok');}
+  });
+});
+
+client.on('close',function(){
+  log('MQTT verbinding gesloten','err');
+  document.getElementById('status').textContent='Offline';
+  document.getElementById('status').className='status err';
+  document.getElementById('connDot').className='dot red';
+});
+
+client.on('error',function(err){
+  log('MQTT error: '+err.message,'err');
+  document.getElementById('status').textContent='Fout';
+  document.getElementById('status').className='status err';
+});
+
+client.on('offline',function(){
+  log('MQTT offline','err');
+  document.getElementById('status').textContent='Offline';
+  document.getElementById('status').className='status err';
+  document.getElementById('connDot').className='dot red';
+});
+
+client.on('message',function(topic,msg){
+  msgCount++;
+  var raw=msg.toString();
+  try{
+    var d=JSON.parse(raw);
+    var seq=d.seq!=null?d.seq:'-';
+    var ageMs=d.t!=null?(Date.now()-d.t):'?';
+    log('Bericht #'+msgCount+' seq='+seq+' age='+ageMs+'ms raw='+raw.substring(0,180),'ok');
+    if(d.batV===undefined && d.pvV===undefined){
+      log('Status bericht, skip');
+      return;
+    }
+
+    liveData=d;
+    lastUpdateMs=Date.now();
+
+    // Handle commLost: device disconnected locally (no VE.Direct frames)
+    if(d.commLost){
+      var st=document.getElementById('status');
+      if(st){ st.textContent='GEEN DATA'; st.className='status warn'; }
+      var cd=document.getElementById('connDot');
+      if(cd) cd.className='dot yellow';
+      updateDashboard({t:Date.now(),batV:0,pvV:0,pvW:0,batA:0,cs:0,csn:'GEEN DATA',err:0,deviceType:d.deviceType||'mppt',alarmBatLow:false,alarmLoadHigh:false,commLost:true,alarmSound:true,mppt:0,mppn:'Off',modelName:d.modelName||liveData.modelName});
+      updateLastUpdate();
+      return;
+    }
+
+    var st=document.getElementById('status');
+    if(st){ st.textContent='Live'; st.className='status ok'; }
+    var cd=document.getElementById('connDot');
+    if(cd) cd.className='dot green';
+    updateDashboard(d);
+    updateDevice(d);
+    updateLastUpdate();
+  }catch(e){
+    log('FOUT bij bericht #'+msgCount+': '+e.message,'err');
+    log('Raw: '+raw.substring(0,120),'err');
+  }
+});
+}
+
+function updateLastUpdate(){
+  var el=document.getElementById('lastUpdate');
+  if(!el)return;
+
+  // No data ever received (lastUpdateMs === 0)
+  if(lastUpdateMs === 0){
+    el.textContent='Wachten op data...';
+    el.style.color='var(--muted)';
+    return;
+  }
+
+  var secs=Math.round((Date.now()-lastUpdateMs)/1000);
+
+  // Connection quality indicator
+  if(secs < 5){
+    el.textContent='Live';
+    el.style.color='var(--green)';
+  } else if(secs < 60){
+    el.textContent='Laatste update: '+secs+'s geleden';
+    el.style.color='var(--muted)';
+  } else if(secs < 3600){
+    el.textContent='Laatste update: '+Math.round(secs/60)+' min geleden';
+    el.style.color='var(--yellow)';
+  } else {
+    el.textContent='Laatste update: '+Math.round(secs/3600)+' uur geleden';
+    el.style.color='var(--red)';
+  }
+
+  // Stale data detection — clear UI after 30s silence
+  if(secs > 30){
+    var connDot = document.getElementById('connDot');
+    if(connDot) connDot.className='dot red';
+    var status = document.getElementById('status');
+    if(status){ status.textContent='Offline'; status.className='status err'; }
+    // Gently clear stale values (no popup)
+    updateDashboard({t:Date.now(),batV:0,pvV:0,pvW:0,batA:0,cs:0,csn:'--',err:0,deviceType:liveData.deviceType||'mppt',alarmBatLow:false,alarmLoadHigh:false,commLost:true,alarmSound:true,mppt:liveData.mppt||0,mppn:liveData.mppn||'Off',modelName:liveData.modelName});
+  }
+}
+setInterval(updateLastUpdate,1000);
+
+// ---- Sound functions (Remote viewer: local mute toggle) ----
+var rvAudioCtx=null;
+function rvPlayAlarmSound(){
+  if(rvMuted) return;
+  if(typeof AudioContext==='undefined') return;
+  if(!rvAudioCtx) rvAudioCtx=new AudioContext();
+  var now=rvAudioCtx.currentTime;
+  for(var i=0;i<3;i++){
+    var o=rvAudioCtx.createOscillator();
+    var g=rvAudioCtx.createGain();
+    o.type='square';
+    o.frequency.setValueAtTime(880,now+i*0.35);
+    o.frequency.exponentialRampToValueAtTime(1100,now+i*0.35+0.15);
+    g.gain.setValueAtTime(1.0,now+i*0.35);
+    g.gain.exponentialRampToValueAtTime(0.01,now+i*0.35+0.25);
+    o.connect(g); g.connect(rvAudioCtx.destination);
+    o.start(now+i*0.35); o.stop(now+i*0.35+0.25);
+  }
+}
+function rvPlayCommLostSound(){
+  // Disabled: connection drops are not user alarms.
+}
+function rvPlayReconnectSound(){
+  if(rvMuted) return;
+  if(typeof AudioContext==='undefined') return;
+  if(!rvAudioCtx) rvAudioCtx=new AudioContext();
+  var now=rvAudioCtx.currentTime;
+  for(var i=0;i<2;i++){
+    var o=rvAudioCtx.createOscillator();
+    var g=rvAudioCtx.createGain();
+    o.type='sine';
+    o.frequency.setValueAtTime(523,now+i*0.4);
+    o.frequency.exponentialRampToValueAtTime(784,now+i*0.4+0.2);
+    g.gain.setValueAtTime(1.0,now+i*0.4);
+    g.gain.exponentialRampToValueAtTime(0.01,now+i*0.4+0.3);
+    o.connect(g); g.connect(rvAudioCtx.destination);
+    o.start(now+i*0.4); o.stop(now+i*0.4+0.3);
+  }
+}
+function toggleRvMute(){
+  rvMuted=!rvMuted;
+  var btn=document.getElementById('rvMuteBtn');
+  if(btn) btn.textContent=rvMuted?'🔕':'🔔';
+}
+
+function setText(id, txt){
+  var el=document.getElementById(id);
+  if(el) el.textContent=txt;
+}
+function setHtml(id, html){
+  var el=document.getElementById(id);
+  if(el) el.innerHTML=html;
+}
+
+function updateDashboard(d){
+  var maxW = d.maxW || (d.batV>40?880:(d.batV>20?440:220));
+  var is24V = (d.batV > 20);
+  var is48V = (d.batV > 40);
+  var isInv = (d.deviceType === 'inverter');
+  
+  var pw=d.pvW!=null?d.pvW.toFixed(0):'--';
+  setText('pvW', pw);
+  
+  // Solar card label: AC OUTPUT for inverter, ZONNEPANEEL for MPPT
+  var solarLabel = document.querySelector('.meter-solar .meter-label');
+  if(solarLabel) solarLabel.textContent = isInv ? '🔌 AC OUTPUT' : '☀️ ZONNEPANEEL';
+  
+  if(isInv){
+    setText('pvV', d.acOutV!=null?d.acOutV.toFixed(1):'--');
+  } else {
+    setText('pvV', d.pvV!=null?d.pvV.toFixed(1):'--');
+  }
+  // Show panel/AC current; wattage is already in the ring gauge
+  var pvA = (d.pvW != null && d.pvV != null && d.pvV > 0) ? (d.pvW / d.pvV) : 0;
+  setText('pvA', d.pvV != null ? pvA.toFixed(1) : '--');
+  
+  setText('batV', d.batV!=null?Number(d.batV).toFixed(2):'--');
+  setText('batA', d.batA!=null?Number(d.batA).toFixed(2):'--');
+  
+  // Yield: hide for inverter
+  var yieldGrid = document.querySelector('.yield-grid');
+  if(yieldGrid) yieldGrid.style.display = isInv ? 'none' : 'grid';
+  setHtml('yToday', (d.yt!=null?Number(d.yt).toFixed(2):'--')+' <span class="value-unit">kWh</span>');
+  setHtml('yTotal', (d.yTo!=null?Number(d.yTo).toFixed(1):'--')+' <span class="value-unit">kWh</span>');
+  
+  var pct=d.pvW!=null?Math.min(100,(d.pvW/maxW)*100):0;
+  var ring=document.getElementById('ring');
+  if(ring) ring.setAttribute('stroke-dasharray',(pct/100)*415+' 415');
+  
+  var batPct=d.batV!=null?Math.min(100,Math.max(0,((d.batV-(is48V?42.0:(is24V?21.0:10.5)))/((is48V?58.8:(is24V?29.4:14.6))-(is48V?42.0:(is24V?21.0:10.5))))*100)):0;
+  var fill=document.getElementById('battMeterFill');
+  if(fill) fill.setAttribute('width',(batPct/100)*212);
+  setText('maskText', Math.round(batPct)+'%');
+  
+  var pvPct=d.pvW!=null?Math.min(100,(d.pvW/maxW)*100):0;
+
+  
+  // Status badge
+  var csb=document.getElementById('csBadge');
+  if(csb){
+    csb.textContent=d.csn||'--';csb.className='cs-indicator pulse';
+    if(isInv){
+      switch(d.cs){case 9:csb.classList.add(d.mode===5?'cs-absorption':'cs-float');break;case 0:csb.classList.add('cs-off');csb.classList.remove('pulse');break;case 245:csb.classList.add('cs-absorption');break;case 2:csb.classList.add('cs-fault');break;default:csb.classList.add('cs-off');}
+    } else {
+      switch(d.cs){case 3:csb.classList.add('cs-bulk');break;case 4:csb.classList.add('cs-absorption');break;case 5:csb.classList.add('cs-float');break;case 0:csb.classList.add('cs-off');csb.classList.remove('pulse');break;case 2:csb.classList.add('cs-fault');break;default:csb.classList.add('cs-off');}
+    }
+  }
+  
+  // MPPT badge: hide for inverter, styled like local Web UI
+  var mpptRow = document.getElementById('mpptBadge');
+  if(mpptRow) mpptRow.parentElement.style.display = isInv ? 'none' : 'block';
+  if(!isInv){
+    var mb=document.getElementById('mpptBadge');
+    if(mb){
+      var mppnText = d.mppn;
+      if(!mppnText || mppnText === '') mppnText = 'Off';
+      mb.textContent=mppnText;
+      mb.className='cs-indicator';
+      if(d.mppt===2) mb.classList.add('cs-float');
+      else if(d.mppt===1) mb.classList.add('cs-absorption');
+      else mb.classList.add('cs-off');
+    }
+  }
+  
+  // Load card: hide for inverter
+  var loadCard = document.querySelector('.meter-load');
+  if(loadCard) loadCard.style.display = isInv ? 'none' : 'block';
+  if(!isInv){
+    var lb=document.getElementById('loadBadge');
+    if(lb){
+      if(d.load===true||d.load===1){lb.innerHTML='<span style="color:#3ecf5e">&#9679; AAN</span> '+(d.loadA!=null&&d.loadA!==undefined?Number(d.loadA).toFixed(1)+'A':'');}
+      else if(d.load===false||d.load===0||d.load===undefined||d.load===null){lb.innerHTML='<span style="color:var(--muted)">&#9679; UIT</span>';}
+      else{lb.innerHTML='<span style="color:var(--muted)">--</span>';}
+    }
+  }
+  
+  if(d.err&&d.err>0){
+    var stE=document.getElementById('status');
+    if(stE){ stE.textContent=d.ern||'Fout'; stE.className='status err'; }
+    var cdE=document.getElementById('connDot');
+    if(cdE) cdE.className='dot red';
+  }
+
+  // Alarm visuals (subtle, no popup/banner)
+  // Header dot: blink red when any alarm or commLost, else normal connection colour
+  var elDot = document.getElementById('connDot');
+  if(elDot) elDot.className = 'dot ' + (d.alarmBatLow || d.commLost ? 'alarm-blink' : (d.batV > 0 ? 'green' : 'red'));
+
+  // Battery card border/title highlight when bat-low or commLost
+  var batCard = document.getElementById('batV') ? document.getElementById('batV').closest('.card') : null;
+  if(batCard) batCard.classList.toggle('alarm-active', !!(d.alarmBatLow || d.commLost));
+  var batLabel = document.querySelector('.meter-batt .meter-label');
+  if(batLabel) batLabel.classList.toggle('alarm', !!(d.alarmBatLow || d.commLost));
+
+  // Solar/AC card title highlight when load-high
+  var solarLabel = document.querySelector('.meter-solar .meter-label');
+  if(solarLabel) solarLabel.classList.toggle('alarm', !!d.alarmLoadHigh);
+
+  // Status badge opacity toggle for any alarm (gentle)
+  var csb=document.getElementById('csBadge');
+  if(csb) csb.style.opacity = (d.alarmBatLow || d.alarmLoadHigh || d.commLost) ? (d.alarmBlink ? '.55' : '1') : '1';
+
+  // --- SLAVE DATA ---
+  var slaveSec = document.getElementById('slaveSection');
+  if(slaveSec){
+    if(d.slave && d.slave.connected){
+      slaveSec.style.display = 'block';
+      var s = d.slave;
+      var elSm = document.getElementById('slaveModel');   if(elSm) elSm.textContent = s.modelName || 'Inverter';
+      var elSav = document.getElementById('slaveAcV');    if(elSav) elSav.innerHTML = (s.acOutV != null ? s.acOutV.toFixed(1) : '--') + ' \u003cspan class="value-unit"\u003eV\u003c/span\u003e';
+      var elSaa = document.getElementById('slaveAcA');    if(elSaa) elSaa.innerHTML = (s.acOutI != null ? s.acOutI.toFixed(1) : '--') + ' \u003cspan class="value-unit"\u003eA\u003c/span\u003e';
+      var elSdv = document.getElementById('slaveDcV');    if(elSdv) elSdv.innerHTML = (s.batV != null ? s.batV.toFixed(2) : '--') + ' \u003cspan class="value-unit"\u003eV\u003c/span\u003e';
+      var elSda = document.getElementById('slaveDcA');    if(elSda) elSda.innerHTML = (s.batA != null ? s.batA.toFixed(2) : '--') + ' \u003cspan class="value-unit"\u003eA\u003c/span\u003e';
+      var elSpw = document.getElementById('slavePw');     if(elSpw) elSpw.innerHTML = (s.pvW != null ? s.pvW.toFixed(0) : '--') + ' \u003cspan class="value-unit"\u003eW\u003c/span\u003e';
+      var elScs = document.getElementById('slaveCs');
+      if(elScs){
+        elScs.textContent = s.csn || 'Off';
+        elScs.className = 'cs-indicator pulse';
+        if(s.cs === 9) elScs.classList.add(s.mode === 5 ? 'cs-absorption' : 'cs-float');
+        else if(s.cs === 0){ elScs.classList.add('cs-off'); elScs.classList.remove('pulse'); }
+        else if(s.cs === 245) elScs.classList.add('cs-absorption');
+        else if(s.cs === 2) elScs.classList.add('cs-fault');
+        else elScs.classList.add('cs-off');
+      }
+    } else {
+      slaveSec.style.display = 'none';
+    }
+  }
+
+  // --- ALARM SOUNDS + TRANSITION DETECTION ---
+  try{
+    var prevLost = !!window._rvWasCommLost;
+    var currLost = !!d.commLost;
+    if(currLost !== prevLost){
+      window._rvWasCommLost = currLost;
+      if(currLost && d.alarmSound !== false){
+        rvPlayCommLostSound();
+        if(typeof navigator!=='undefined' && navigator.vibrate) navigator.vibrate([300,150,300]);
+      } else if(!currLost){
+        rvPlayReconnectSound();
+        if(typeof navigator!=='undefined' && navigator.vibrate) navigator.vibrate([150,80,150,80,300]);
+      }
+    }
+    // Regular threshold alarms (battery/load) — repeat every 30s while condition persists
+    if((d.alarmBatLow || d.alarmLoadHigh) && d.alarmSound !== false){
+      var now = Date.now();
+      if(!window._rvAlarmLast || now - window._rvAlarmLast > 30000){
+        window._rvAlarmLast = now;
+        if(typeof navigator!=='undefined' && navigator.vibrate){
+          navigator.vibrate([200,100,200,100,400]);
+        }
+        rvPlayAlarmSound();
+      }
+    }
+  }catch(e){console.error('Alarm trigger error:', e);}
+}
+
+function updateDevice(d){
+  setText('devPid', d.pid||'--');
+  setText('devModel', d.modelName||'Onbekend model');
+  setText('devFw', d.fw||'--');
+  setText('devSer', d.ser||'--');
+  setText('devHsds', d.hsds!=null?d.hsds:'--');
+  setText('devUptime', d.uptime_h!=null?(d.uptime_h+' uur'):'--');
+}
+
+function switchTab(name){
+  document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('active');});
+  document.querySelectorAll('nav.tabs button').forEach(function(b){b.classList.remove('active');});
+  document.getElementById('panel-'+name).classList.add('active');
+  var btns=document.querySelectorAll('nav.tabs button');
+  if(name==='dash')btns[0].classList.add('active');
+  if(name==='hist')btns[1].classList.add('active');
+  if(name==='device')btns[2].classList.add('active');
+  if(name==='settings')btns[3].classList.add('active');
+}
+function reconnectMqtt(){
+  rvBroker=document.getElementById('rvBroker').value.trim()||'broker.hivemq.com';
+  rvTopic=document.getElementById('rvTopic').value.trim();
+  rvWssPort=document.getElementById('rvWssPort').value.trim()||'8884';
+  blStore('bluelink.broker', rvBroker);
+  blStore('bluelink.topic', rvTopic);
+  blStore('bluelink.port', rvWssPort);
+  if(client) client.end(true);
+  lastUpdateMs=0; msgCount=0;
+  client=makeMqttClient();
+  attachMqttHandlers();
+  updateRvMqttCurrent();
+  showToast('Verbinden met '+rvBroker+'...');
+}
+function resetRvMqttDefaults(){
+  document.getElementById('rvBroker').value='broker.hivemq.com';
+  document.getElementById('rvTopic').value='';
+  document.getElementById('rvWssPort').value='8884';
+  reconnectMqtt();
+}
+function updateRvMqttCurrent(){
+  var el=document.getElementById('rvMqttCurrent');
+  if(el) el.textContent='Huidig: wss://'+rvBroker+':'+rvWssPort+'/'+rvTopic;
+}
+updateRvMqttCurrent();
+function showToast(m,t){var el=document.getElementById('toast');el.textContent=m;el.className='toast show'+(t?' '+t:'');setTimeout(function(){el.classList.remove('show');},3000);}
+
+// Debug overlay hidden by default; add ?debug=1 to URL to show it.
+if(window.location.search.indexOf('debug=1')>=0){
+  document.getElementById('debugLog').classList.add('show');
+  log('Debug mode actief');
+}
+
+// Register service worker for offline PWA support.
+if('serviceWorker' in navigator){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('./sw.js')
+      .then(function(registration){
+        log('Service Worker geregistreerd', 'ok');
+        registration.addEventListener('updatefound', function(){
+          var newWorker = registration.installing;
+          if(!newWorker) return;
+          newWorker.addEventListener('statechange', function(){
+            if(newWorker.state === 'installed' && navigator.serviceWorker.controller){
+              showUpdatePrompt(newWorker);
+            }
+          });
+        });
+      })
+      .catch(function(err){
+        log('Service Worker registratie mislukt: '+err.message, 'err');
+      });
+  });
+  var refreshing=false;
+  navigator.serviceWorker.addEventListener('controllerchange', function(){
+    if(refreshing) return;
+    refreshing=true;
+    window.location.reload();
+  });
+}
+
+function showUpdatePrompt(newWorker){
+  var toast=document.getElementById('toast');
+  if(!toast) return;
+  toast.textContent='Update beschikbaar — tik om te herladen';
+  toast.className='toast show warn';
+  toast.onclick=function(){
+    newWorker.postMessage({type:'SKIP_WAITING'});
+    toast.onclick=null;
+    toast.classList.remove('show');
+  };
+}
+</script>
+</body>
+</html>
+
+
+
