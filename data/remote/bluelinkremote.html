@@ -151,6 +151,15 @@ nav.tabs button svg{display:block;margin:0 auto 3px;width:18px;height:18px}
 <div class="col card"><div class="card-title">📈 POWER</div><div class="value sm" id="slavePw">--<span class="value-unit"> W</span></div></div>
 <div class="col card"><div class="card-title">🎯 STATUS</div><span class="cs-indicator cs-off" id="slaveCs">Off</span></div>
 </div>
+<div class="row" style="margin-top:8px">
+  <div class="col card"><div class="card-title">ℹ️ SLAVE INFO</div>
+    <div style="font-size:11px;color:var(--muted);line-height:1.5">
+      <div id="slavePid">--</div>
+      <div id="slaveFw">FW: --</div>
+      <div id="slaveSer">SN: --</div>
+    </div>
+  </div>
+</div>
 </div>
 
 <div style="text-align:center;padding:6px;font-size:10px;color:var(--muted);background:var(--card2);border-radius:8px;margin-top:8px" id="lastUpdate">Wachten op data...</div>
@@ -174,22 +183,23 @@ nav.tabs button svg{display:block;margin:0 auto 3px;width:18px;height:18px}
 <div class="form-row"><span class="form-label">Serienummer</span><span class="form-value" id="devSer">--</span></div>
 <div class="form-row"><span class="form-label">Dagen sinds laatste opladen</span><span class="form-value" id="devHsds">--</span></div>
 <div class="form-row"><span class="form-label">BlueLink uptime</span><span class="form-value" id="devUptime">--</span></div>
-<p style="font-size:10px;color:var(--muted);margin-top:6px;line-height:1.3">Firmware en serienummer zijn alleen beschikbaar via de lokale BlueLink Web UI om privacy te beschermen.</p>
+
 </div>
 </div>
 
 <div id="panel-settings" class="panel">
-<div class="card"><div class="card-title">📡 MQTT kijk-instellingen</div>
+<div class="card"><div class="card-title">📡 Remote viewer koppeling</div>
 <p style="font-size:11px;color:var(--muted);margin:0 0 8px 0;line-height:1.4">
-  Deze instellingen moeten overeenkomen met wat je in de lokale BlueLink Web UI ziet (Settings → MQTT). Gebruik het unieke topic dat automatisch bij jouw Wemos hoort; niet het gedeelde <code>bluelink/data</code> topic.</p>
-<div class="form-row"><span class="form-label">Broker</span><span><input type="text" id="rvBroker" value="broker.hivemq.com" style="width:140px"></span></div>
-<div class="form-row"><span class="form-label">Topic</span><span><input type="text" id="rvTopic" placeholder="bluelink/data/XXXX" style="width:140px"></span></div>
-<div class="form-row"><span class="form-label">WebSocket port</span><span><input type="number" id="rvWssPort" value="8884" style="width:70px"></span></div>
-<div style="display:flex;gap:6px;margin-top:8px">
-  <button class="btn" onclick="reconnectMqtt()">Verbinden</button>
-  <button class="btn" onclick="resetRvMqttDefaults()">Reset default</button>
-</div>
+  Deze viewer is automatisch gekoppeld via de launcher of QR-code van de BlueLink. Je hoeft hier niets in te stellen.
+</p>
+<div class="form-row"><span class="form-label">Broker</span><span id="rvBrokerDisplay" class="form-value">--</span></div>
+<div class="form-row"><span class="form-label">Topic</span><span id="rvTopicDisplay" class="form-value">--</span></div>
+<div class="form-row"><span class="form-label">WebSocket poort</span><span id="rvPortDisplay" class="form-value">--</span></div>
 <p id="rvMqttCurrent" style="font-size:11px;color:var(--muted);margin-top:8px;margin-bottom:0">Huidig: --</p>
+<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
+  <button class="btn danger" onclick="forgetBlueLink()">Vergeet deze BlueLink</button>
+  <button class="btn" onclick="window.location.reload()">🔄 Herlaad</button>
+</div>
 </div>
 </div>
 </div>
@@ -241,6 +251,10 @@ function blLoad(key, fallback){
     rvTopic  = blLoad('bluelink.topic', rvTopic);
     rvWssPort= blLoad('bluelink.port', rvWssPort);
   }
+  setText('rvBrokerDisplay', rvBroker || '--');
+  setText('rvTopicDisplay', rvTopic || '--');
+  setText('rvPortDisplay', rvWssPort || '8884');
+  updateRvMqttCurrent();
 })();
 function makeMqttClient(){
   var url='wss://'+rvBroker+':'+rvWssPort+'/mqtt';
@@ -565,6 +579,9 @@ function updateDashboard(d){
         else if(s.cs === 2) elScs.classList.add('cs-fault');
         else elScs.classList.add('cs-off');
       }
+      var elSpid = document.getElementById('slavePid'); if(elSpid) elSpid.textContent = s.pid || '--';
+      var elSfw  = document.getElementById('slaveFw');  if(elSfw)  elSfw.textContent  = 'FW: ' + (s.fw || '--');
+      var elSser = document.getElementById('slaveSer'); if(elSser) elSser.textContent = 'SN: ' + (s.ser || '--');
     } else {
       slaveSec.style.display = 'none';
     }
@@ -619,31 +636,22 @@ function switchTab(name){
   if(name==='device')btns[2].classList.add('active');
   if(name==='settings')btns[3].classList.add('active');
 }
-function reconnectMqtt(){
-  rvBroker=document.getElementById('rvBroker').value.trim()||'broker.hivemq.com';
-  rvTopic=document.getElementById('rvTopic').value.trim();
-  rvWssPort=document.getElementById('rvWssPort').value.trim()||'8884';
-  blStore('bluelink.broker', rvBroker);
-  blStore('bluelink.topic', rvTopic);
-  blStore('bluelink.port', rvWssPort);
-  if(client) client.end(true);
-  lastUpdateMs=0; msgCount=0;
-  client=makeMqttClient();
-  attachMqttHandlers();
-  updateRvMqttCurrent();
-  showToast('Verbinden met '+rvBroker+'...');
-}
-function resetRvMqttDefaults(){
-  document.getElementById('rvBroker').value='broker.hivemq.com';
-  document.getElementById('rvTopic').value='';
-  document.getElementById('rvWssPort').value='8884';
-  reconnectMqtt();
-}
 function updateRvMqttCurrent(){
   var el=document.getElementById('rvMqttCurrent');
   if(el) el.textContent='Huidig: wss://'+rvBroker+':'+rvWssPort+'/'+rvTopic;
 }
-updateRvMqttCurrent();
+function forgetBlueLink(){
+  if(!confirm('Deze BlueLink ontkoppelen en alle opgeslagen instellingen wissen?')){ return; }
+  try{
+    localStorage.removeItem('bluelink.broker');
+    localStorage.removeItem('bluelink.topic');
+    localStorage.removeItem('bluelink.port');
+  }catch(e){}
+  showToast('Koppeling vergeten — herlaad om opnieuw te koppelen');
+  document.getElementById('status').textContent='Geen topic';
+  document.getElementById('status').className='status err';
+  document.getElementById('connDot').className='dot red';
+}
 function showToast(m,t){var el=document.getElementById('toast');el.textContent=m;el.className='toast show'+(t?' '+t:'');setTimeout(function(){el.classList.remove('show');},3000);}
 
 // Debug overlay hidden by default; add ?debug=1 to URL to show it.
