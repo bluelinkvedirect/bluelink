@@ -166,10 +166,15 @@ nav.tabs button svg{display:block;margin:0 auto 3px;width:18px;height:18px}
 </div>
 
 <div id="panel-hist" class="panel">
-<div class="card" style="text-align:center;padding:40px 20px">
-<div style="font-size:40px;margin-bottom:10px">&#128202;</div>
-<div style="color:var(--muted);font-size:13px">Historische grafieken zijn alleen lokaal beschikbaar via de BlueLink WiFi.</div>
-<div style="color:var(--accent);font-size:12px;margin-top:6px">Verbind met BlueLink WiFi &amp; ga naar 192.168.4.1</div>
+<div class="card"><div class="card-title">Vermogen & Voltage (vandaag)</div>
+  <div id="chart-box" style="width:100%;height:200px;position:relative;background:#081020;border-radius:10px;overflow:hidden">
+    <canvas id="histChart"></canvas>
+  </div>
+</div>
+<div class="card" style="margin-top:10px"><div class="card-title">Dagelijkse opbrengst</div>
+  <div id="day-box" style="width:100%;height:180px;position:relative;background:#081020;border-radius:10px;overflow:hidden">
+    <canvas id="dayChart"></canvas>
+  </div>
 </div>
 </div>
 
@@ -270,6 +275,8 @@ var liveData={};
 var lastUpdateMs=0;   // 0 = no data seen yet
 var msgCount=0;
 var rvMuted=false;
+var histPoints=[];
+var dayTotals=[];
 
 attachMqttHandlers();
 
@@ -291,6 +298,11 @@ client.on('connect',function(){
   client.subscribe(rvTopic,function(err){
     if(err){log('Subscribe fout: '+err.message,'err');}
     else{log('Geabonneerd op '+rvTopic,'ok');}
+  });
+  var histTopic=rvTopic+'/history';
+  client.subscribe(histTopic,function(err){
+    if(err){log('Subscribe hist fout: '+err.message,'err');}
+    else{log('Geabonneerd op '+histTopic,'ok');}
   });
 });
 
@@ -324,6 +336,19 @@ client.on('message',function(topic,msg){
     log('Bericht #'+msgCount+' seq='+seq+' age='+ageMs+'ms raw='+raw.substring(0,180),'ok');
     if(d.batV===undefined && d.pvV===undefined){
       log('Status bericht, skip');
+      return;
+    }
+
+    if(d.type==='history' || (Array.isArray(d.p) && Array.isArray(d.v))){
+      if(Array.isArray(d.p) && Array.isArray(d.v)){
+        histPoints=[];
+        for(var i=0;i<d.p.length;i++){
+          histPoints.push({p:d.p[i], v:d.v[i]});
+        }
+      }
+      if(Array.isArray(d.days)) dayTotals=d.days;
+      drawHistChart();
+      drawDayChart();
       return;
     }
 
@@ -632,7 +657,7 @@ function switchTab(name){
   document.getElementById('panel-'+name).classList.add('active');
   var btns=document.querySelectorAll('nav.tabs button');
   if(name==='dash')btns[0].classList.add('active');
-  if(name==='hist')btns[1].classList.add('active');
+  if(name==='hist'){btns[1].classList.add('active'); drawHistChart(); drawDayChart();}
   if(name==='device')btns[2].classList.add('active');
   if(name==='settings')btns[3].classList.add('active');
 }
@@ -699,6 +724,53 @@ function showUpdatePrompt(newWorker){
     toast.classList.remove('show');
   };
 }
+
+function drawHistChart(){
+  var c=document.getElementById('histChart'), box=document.getElementById('chart-box');
+  if(!c||!box) return;
+  var W=box.clientWidth, H=box.clientHeight, dpr=window.devicePixelRatio||1;
+  c.width=W*dpr; c.height=H*dpr; c.style.width=W+'px'; c.style.height=H+'px';
+  var ctx=c.getContext('2d'); ctx.scale(dpr,dpr); ctx.clearRect(0,0,W,H);
+  if(!histPoints.length){ ctx.fillStyle='#5a7da0'; ctx.font='14px sans-serif'; ctx.textAlign='center'; ctx.fillText('Geen historie data',W/2,H/2); return; }
+  var pad={t:18,r:44,b:24,l:40}, pw=W-pad.l-pad.r, ph=H-pad.t-pad.b, maxW=0, maxV=0, i;
+  for(i=0;i<histPoints.length;i++){ if(histPoints[i].p>maxW) maxW=histPoints[i].p; var vv=histPoints[i].v/1000; if(vv>maxV) maxV=vv; }
+  maxW=Math.ceil(maxW/20)*20+20||40; maxV=Math.ceil(maxV*10)/10+.5||12;
+  ctx.strokeStyle='rgba(255,255,255,0.06)'; ctx.lineWidth=1;
+  for(i=0;i<=4;i++){ var y=pad.t+(ph/4)*i; ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(W-pad.r,y); ctx.stroke(); }
+  for(i=0;i<=6;i++){ var x=pad.l+(pw/6)*i; ctx.beginPath(); ctx.moveTo(x,pad.t); ctx.lineTo(x,pad.t+ph); ctx.stroke(); }
+  ctx.fillStyle='#5a7da0'; ctx.font='9px sans-serif'; ctx.textAlign='right';
+  for(i=0;i<=4;i++){ var y=pad.t+(ph/4)*i; ctx.fillText(Math.round(maxW-(maxW/4)*i)+'W',pad.l-4,y+3); }
+  ctx.textAlign='left';
+  for(i=0;i<=4;i++){ var y=pad.t+(ph/4)*i; ctx.fillText((maxV-(maxV/4)*i).toFixed(1)+'V',W-pad.r+4,y+3); }
+  ctx.fillStyle='#e67e00'; ctx.fillRect(pad.l,pad.t-14,8,8); ctx.fillStyle='#5a7da0'; ctx.fillText('PV (W)',pad.l+12,pad.t-4);
+  ctx.fillStyle='#3b9eff'; ctx.fillRect(pad.l+64,pad.t-14,8,8); ctx.fillStyle='#5a7da0'; ctx.fillText('BAT (V)',pad.l+76,pad.t-4);
+  ctx.beginPath(); ctx.strokeStyle='#e67e00'; ctx.lineWidth=2;
+  for(i=0;i<histPoints.length;i++){ var x=pad.l+(pw/(histPoints.length-1))*i; var y=pad.t+ph-(histPoints[i].p/maxW)*ph; if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); }
+  ctx.stroke(); ctx.lineTo(x,pad.t+ph); ctx.lineTo(pad.l,pad.t+ph); ctx.closePath(); ctx.fillStyle='rgba(230,126,0,0.08)'; ctx.fill();
+  ctx.beginPath(); ctx.strokeStyle='#3b9eff'; ctx.lineWidth=2;
+  for(i=0;i<histPoints.length;i++){ x=pad.l+(pw/(histPoints.length-1))*i; y=pad.t+ph-(histPoints[i].v/1000/maxV)*ph; if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); }
+  ctx.stroke();
+}
+
+function drawDayChart(){
+  var c=document.getElementById('dayChart'), box=document.getElementById('day-box');
+  if(!c||!box) return;
+  var W=box.clientWidth, H=box.clientHeight, dpr=window.devicePixelRatio||1;
+  c.width=W*dpr; c.height=H*dpr; c.style.width=W+'px'; c.style.height=H+'px';
+  var ctx=c.getContext('2d'); ctx.scale(dpr,dpr); ctx.clearRect(0,0,W,H);
+  if(!dayTotals.length){ ctx.fillStyle='#5a7da0'; ctx.font='14px sans-serif'; ctx.textAlign='center'; ctx.fillText('Geen dagelijkse data',W/2,H/2); return; }
+  var pad={t:14,r:8,b:28,l:8}, pw=W-pad.l-pad.r, ph=H-pad.t-pad.b, maxK=0, i;
+  for(i=0;i<dayTotals.length;i++){ if(dayTotals[i].k>maxK) maxK=dayTotals[i].k; }
+  maxK=Math.ceil(maxK*10)/10||0.5;
+  ctx.strokeStyle='rgba(255,255,255,0.06)'; ctx.lineWidth=1;
+  for(i=0;i<=4;i++){ var y=pad.t+(ph/4)*i; ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(W-pad.r,y); ctx.stroke(); }
+  ctx.fillStyle='#5a7da0'; ctx.font='9px sans-serif'; ctx.textAlign='right';
+  for(i=0;i<=4;i++){ var y=pad.t+(ph/4)*i; ctx.fillText((maxK-(maxK/4)*i).toFixed(1)+'kWh',pad.l-4,y+3); }
+  var bw=Math.min(36,pw/dayTotals.length-4);
+  for(i=0;i<dayTotals.length;i++){ var x=pad.l+(pw/dayTotals.length)*i+(pw/dayTotals.length-bw)/2; var bh=(dayTotals[i].k/maxK)*ph; var y=pad.t+ph-bh; ctx.fillStyle='#1b7ccc'; ctx.fillRect(x,y,bw,bh); ctx.fillStyle='#5a7da0'; ctx.font='8px sans-serif'; ctx.textAlign='center'; ctx.fillText(dayTotals[i].d,x+bw/2,pad.t+ph+16); }
+}
+
+window.addEventListener('resize', function(){ drawHistChart(); drawDayChart(); });
 </script>
 </body>
 </html>
