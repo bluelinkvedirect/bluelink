@@ -633,12 +633,12 @@ function updateDevice(d){
 function switchTab(name){
   document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('active');});
   document.querySelectorAll('nav.tabs button').forEach(function(b){b.classList.remove('active');});
-  document.getElementById('panel-'+name).classList.add('active');
+  var panel=document.getElementById('panel-'+name); if(panel) panel.classList.add('active');
   var btns=document.querySelectorAll('nav.tabs button');
-  if(name==='dash')btns[0].classList.add('active');
-  if(name==='hist'){btns[1].classList.add('active'); drawHistChart(); drawDayChart();}
-  if(name==='device')btns[2].classList.add('active');
-  if(name==='settings')btns[3].classList.add('active');
+  var map={dash:0,hist:1,device:2};
+  var idx=map[name];
+  if(idx!=null&&btns[idx]) btns[idx].classList.add('active');
+  if(name==='hist'){drawHistChart();drawDayChart();}
 }
 function showToast(m,t){var el=document.getElementById('toast');el.textContent=m;el.className='toast show'+(t?' '+t:'');setTimeout(function(){el.classList.remove('show');},3000);}
 
