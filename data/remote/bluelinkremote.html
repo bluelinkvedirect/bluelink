@@ -312,12 +312,8 @@ client.on('message',function(topic,msg){
     var seq=d.seq!=null?d.seq:'-';
     var ageMs=d.t!=null?(Date.now()-d.t):'?';
     log('Message #'+msgCount+' seq='+seq+' age='+ageMs+'ms raw='+raw.substring(0,180),'ok');
-    if(d.batV===undefined && d.pvV===undefined){
-      log('Status message, skip');
-      return;
-    }
-
     if(d.type==='history' || (Array.isArray(d.p) && Array.isArray(d.v))){
+      log('History message received','ok');
       if(Array.isArray(d.p) && Array.isArray(d.v)){
         histPoints=[];
         for(var i=0;i<d.p.length;i++){
@@ -327,6 +323,11 @@ client.on('message',function(topic,msg){
       if(Array.isArray(d.days)) dayTotals=d.days;
       drawHistChart();
       drawDayChart();
+      return;
+    }
+
+    if(d.batV===undefined && d.pvV===undefined){
+      log('Status message, skip');
       return;
     }
 
