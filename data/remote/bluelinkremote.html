@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
@@ -11,7 +11,7 @@
 <link rel="manifest" href="./manifest.json">
 <link rel="apple-touch-icon" sizes="180x180" href="./icon-180.png">
 <link rel="icon" type="image/png" sizes="32x32" href="./icon-32.png">
-<title>BlueLink - Victron MPPT</title>
+<title>BlueLink - Victron Monitor</title>
 <style>
 :root{--bg:#070e1a;--card:#0b1730;--card2:#081020;--border:#152850;--accent:#1b7ccc;--accent2:#3b9eff;--text:#c8d8f0;--muted:#5a7da0;--green:#3ecf5e;--yellow:#e6b800;--orange:#e67e00;--red:#e63946}
 *{margin:0;padding:0;box-sizing:border-box}
@@ -58,7 +58,8 @@ nav.tabs button svg{display:block;margin:0 auto 3px;width:18px;height:18px}
 .form-label{font-size:12px;color:var(--muted)}.form-value{font-size:12px;color:var(--accent);font-weight:500}
 .toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;padding:8px 18px;border-radius:8px;font-size:12px;z-index:20;opacity:0;transition:opacity .3s;box-shadow:0 4px 16px rgba(0,0,0,.4)}
 .toast.show{opacity:1}.toast.ok{background:var(--green)}.toast.err{background:var(--red)}.toast.warn{background:var(--orange)}
-
+.btn{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.25);transition:background .2s}
+.btn:active{transform:translateY(1px)}
 @keyframes solarPulse{0%,100%{opacity:.7;transform:scale(1)}50%{opacity:1;transform:scale(1.05)}}
 @keyframes glowPulse{0%,100%{filter:drop-shadow(0 0 2px currentColor)}50%{filter:drop-shadow(0 0 8px currentColor)}}
 /* Alarm styles */
@@ -91,7 +92,7 @@ nav.tabs button svg{display:block;margin:0 auto 3px;width:18px;height:18px}
 </head>
 <body>
 <div id="debugLog"></div>
-<header><h1><span id="connDot" class="dot red"></span>BlueLink</h1><div style="display:flex;align-items:center;gap:8px"><button id="rvMuteBtn" onclick="toggleRvMute()" style="background:0;border:0;color:var(--yellow);font-size:18px;cursor:pointer;padding:2px" title="Alarm geluid">🔔</button><span id="status" class="status err">Offline</span></div></header>
+<header><h1><span id="connDot" class="dot red"></span>BlueLink</h1><div style="display:flex;align-items:center;gap:8px"><button id="rvMuteBtn" onclick="toggleRvMute()" style="background:0;border:0;color:var(--yellow);font-size:18px;cursor:pointer;padding:2px" title="Alarm sound">🔔</button><span id="status" class="status err">Offline</span></div></header>
 <main>
 
 <div id="panel-dash" class="panel active">
@@ -99,7 +100,7 @@ nav.tabs button svg{display:block;margin:0 auto 3px;width:18px;height:18px}
 
 <div class="card meter-card meter-solar">
 <div class="meter-top">
-<div class="meter-label">☀️ ZONNEPANEEL</div>
+<div class="meter-label">☀️ SOLAR</div>
 <div style="display:flex;align-items:baseline;justify-content:space-between">
 <div><span class="meter-value" id="pvV">--</span><span class="meter-unit">V</span></div>
 <div><span class="meter-value" id="pvA">--</span><span class="meter-unit">A</span></div>
@@ -109,7 +110,7 @@ nav.tabs button svg{display:block;margin:0 auto 3px;width:18px;height:18px}
 
 <div class="card meter-card meter-batt">
 <div class="meter-top">
-<div class="meter-label">🔋 BATTERIJ</div>
+<div class="meter-label">🔋 BATTERY</div>
 <div style="display:flex;align-items:baseline;justify-content:space-between">
 <div><span class="meter-value" id="batV">--</span><span class="meter-unit">V</span></div>
 <div><span class="meter-value" id="batA">--</span><span class="meter-unit">A</span></div>
@@ -124,7 +125,7 @@ nav.tabs button svg{display:block;margin:0 auto 3px;width:18px;height:18px}
 </div>
 
 <div class="row">
-<div class="col card"><div class="card-title"><span class="charge-glow">📊</span> Laadstatus</div><span class="cs-indicator cs-off pulse" id="csBadge" style="margin-top:8px;display:inline-block">Off</span></div>
+<div class="col card"><div class="card-title"><span class="charge-glow">📊</span> CHARGE STATUS</div><span class="cs-indicator cs-off pulse" id="csBadge" style="margin-top:8px;display:inline-block">Off</span></div>
 <div class="col card"><div class="card-title">🎯 MPPT Tracker</div><span class="cs-indicator cs-off" id="mpptBadge" style="margin-top:8px;display:inline-block">--</span></div>
 </div>
 
@@ -135,7 +136,7 @@ nav.tabs button svg{display:block;margin:0 auto 3px;width:18px;height:18px}
 </div>
 </div>
 
-<div class="yield-grid"><div class="card" style="margin:0"><div class="card-title">📅 Opbrengst vandaag</div><div class="value sm" id="yToday">-- <span class="value-unit">kWh</span></div></div><div class="card" style="margin:0"><div class="card-title">🏆 Totaal</div><div class="value sm" id="yTotal">-- <span class="value-unit">kWh</span></div></div></div>
+<div class="yield-grid"><div class="card" style="margin:0"><div class="card-title">📅 YIELD TODAY</div><div class="value sm" id="yToday">-- <span class="value-unit">kWh</span></div></div><div class="card" style="margin:0"><div class="card-title">🏆 TOTAL</div><div class="value sm" id="yTotal">-- <span class="value-unit">kWh</span></div></div></div>
 <!-- SLAVE DEVICE (Inverter) -- hidden by default -->
 <div id="slaveSection" style="display:none;margin-top:10px;border-top:1px dashed var(--border);padding-top:10px">
 <div class="card-title" style="color:var(--accent2);margin-bottom:8px">🔌 SLAVE: <span id="slaveModel">--</span></div>
@@ -162,16 +163,16 @@ nav.tabs button svg{display:block;margin:0 auto 3px;width:18px;height:18px}
 </div>
 </div>
 
-<div style="text-align:center;padding:6px;font-size:10px;color:var(--muted);background:var(--card2);border-radius:8px;margin-top:8px" id="lastUpdate">Wachten op data...</div>
+<div style="text-align:center;padding:6px;font-size:10px;color:var(--muted);background:var(--card2);border-radius:8px;margin-top:8px" id="lastUpdate">Waiting for data...</div>
 </div>
 
 <div id="panel-hist" class="panel">
-<div class="card"><div class="card-title">Vermogen & Voltage (vandaag)</div>
+<div class="card"><div class="card-title">Power & Voltage (today)</div>
   <div id="chart-box" style="width:100%;height:200px;position:relative;background:#081020;border-radius:10px;overflow:hidden">
     <canvas id="histChart"></canvas>
   </div>
 </div>
-<div class="card" style="margin-top:10px"><div class="card-title">Dagelijkse opbrengst</div>
+<div class="card" style="margin-top:10px"><div class="card-title">Daily Yield</div>
   <div id="day-box" style="width:100%;height:180px;position:relative;background:#081020;border-radius:10px;overflow:hidden">
     <canvas id="dayChart"></canvas>
   </div>
@@ -179,31 +180,27 @@ nav.tabs button svg{display:block;margin:0 auto 3px;width:18px;height:18px}
 </div>
 
 <div id="panel-device" class="panel">
-<div class="card"><div class="card-title">Apparaat informatie</div>
+<div class="card"><div class="card-title">Device Info</div>
 <div class="form-row"><span class="form-label">Product ID</span><span class="form-value" id="devPid">--</span></div>
 <div class="form-row"><span class="form-label">Model</span><span class="form-value" id="devModel">--</span></div>
 <div class="form-row"><span class="form-label">Type</span><span class="form-value" id="devType">--</span></div>
-<div class="form-row"><span class="form-label">Max vermogen</span><span class="form-value" id="devMaxW">--</span></div>
+<div class="form-row"><span class="form-label">Max Power</span><span class="form-value" id="devMaxW">--</span></div>
 <div class="form-row"><span class="form-label">Firmware</span><span class="form-value" id="devFw">--</span></div>
-<div class="form-row"><span class="form-label">Serienummer</span><span class="form-value" id="devSer">--</span></div>
-<div class="form-row"><span class="form-label">Dagen sinds laatste opladen</span><span class="form-value" id="devHsds">--</span></div>
+<div class="form-row"><span class="form-label">Serial Number</span><span class="form-value" id="devSer">--</span></div>
+<div class="form-row"><span class="form-label">Days since last charge</span><span class="form-value" id="devHsds">--</span></div>
 <div class="form-row"><span class="form-label">BlueLink uptime</span><span class="form-value" id="devUptime">--</span></div>
 
 </div>
 </div>
 
 <div id="panel-settings" class="panel">
-<div class="card"><div class="card-title">📡 Remote viewer koppeling</div>
+<div class="card"><div class="card-title">📡 Remote Viewer Pairing</div>
 <p style="font-size:11px;color:var(--muted);margin:0 0 8px 0;line-height:1.4">
-  Deze viewer is automatisch gekoppeld via de launcher of QR-code van de BlueLink. Je hoeft hier niets in te stellen.
+  This viewer is automatically paired through the BlueLink launcher or QR code. No manual setup is needed.
 </p>
-<div class="form-row"><span class="form-label">Broker</span><span id="rvBrokerDisplay" class="form-value">--</span></div>
-<div class="form-row"><span class="form-label">Topic</span><span id="rvTopicDisplay" class="form-value">--</span></div>
-<div class="form-row"><span class="form-label">WebSocket poort</span><span id="rvPortDisplay" class="form-value">--</span></div>
-<p id="rvMqttCurrent" style="font-size:11px;color:var(--muted);margin-top:8px;margin-bottom:0">Huidig: --</p>
+<div class="form-row"><span class="form-label">Paired topic</span><span id="rvTopicInfo" class="form-value">--</span></div>
 <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
-  <button class="btn danger" onclick="forgetBlueLink()">Vergeet deze BlueLink</button>
-  <button class="btn" onclick="window.location.reload()">🔄 Herlaad</button>
+  <button class="btn" onclick="window.location.reload()">🔄 Reload</button>
 </div>
 </div>
 </div>
@@ -215,7 +212,7 @@ nav.tabs button svg{display:block;margin:0 auto 3px;width:18px;height:18px}
 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>Dashboard
 </button>
 <button onclick="switchTab('hist')">
-<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>Historie
+<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>History
 </button>
 <button onclick="switchTab('device')">
 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>Device
@@ -230,7 +227,7 @@ nav.tabs button svg{display:block;margin:0 auto 3px;width:18px;height:18px}
 <script>
 function log(m,cls){
   var el=document.getElementById('debugLog');
-  var t=new Date().toLocaleTimeString('nl-NL',{hour12:false})+' ';
+  var t=new Date().toLocaleTimeString('en-GB',{hour12:false})+' ';
   var c=cls?' class="'+cls+'"':'';
   el.innerHTML='<div'+c+'>'+t+m+'</div>'+el.innerHTML;
   if(el.innerHTML.length>3000)el.innerHTML=el.innerHTML.substring(0,3000);
@@ -240,7 +237,7 @@ function log(m,cls){
 var rvBroker='broker.hivemq.com', rvTopic='', rvWssPort='8884';
 // Read broker/topic/port from URL query parameters or localStorage.
 function blStore(key, value){
-  try { localStorage.setItem(key, value); } catch (e) { log('Opslag niet beschikbaar', 'err'); }
+  try { localStorage.setItem(key, value); } catch (e) { log('Storage not available', 'err'); }
 }
 function blLoad(key, fallback){
   try { return localStorage.getItem(key) || fallback; } catch (e) { return fallback; }
@@ -256,10 +253,7 @@ function blLoad(key, fallback){
     rvTopic  = blLoad('bluelink.topic', rvTopic);
     rvWssPort= blLoad('bluelink.port', rvWssPort);
   }
-  setText('rvBrokerDisplay', rvBroker || '--');
-  setText('rvTopicDisplay', rvTopic || '--');
-  setText('rvPortDisplay', rvWssPort || '8884');
-  updateRvMqttCurrent();
+  setText('rvTopicInfo', rvTopic || 'Not paired');
 })();
 function makeMqttClient(){
   var url='wss://'+rvBroker+':'+rvWssPort+'/mqtt';
@@ -283,31 +277,31 @@ attachMqttHandlers();
 function attachMqttHandlers(){
   if(!client) return;
 client.on('connect',function(){
-  log('MQTT verbonden', 'ok');
+  log('MQTT connected', 'ok');
   if(!rvTopic){
-    log('Geen MQTT topic ingesteld. Open de viewer via de Wemos Web UI (QR of launcher).', 'err');
-    document.getElementById('status').textContent='Geen topic';
+    log('No MQTT topic configured. Open the viewer from the Wemos Web UI (QR or launcher).', 'err');
+    document.getElementById('status').textContent='No topic';
     document.getElementById('status').className='status err';
     document.getElementById('connDot').className='dot red';
     return;
   }
   log('Broker: '+rvBroker+':'+rvWssPort+' topic: '+rvTopic);
-  document.getElementById('status').textContent='Wachten op data...';
+  document.getElementById('status').textContent='Waiting for data...';
   document.getElementById('status').className='status warn';
   document.getElementById('connDot').className='dot yellow';
   client.subscribe(rvTopic,function(err){
-    if(err){log('Subscribe fout: '+err.message,'err');}
-    else{log('Geabonneerd op '+rvTopic,'ok');}
+    if(err){log('Subscribe error: '+err.message,'err');}
+    else{log('Subscribed to '+rvTopic,'ok');}
   });
   var histTopic=rvTopic+'/history';
   client.subscribe(histTopic,function(err){
-    if(err){log('Subscribe hist fout: '+err.message,'err');}
-    else{log('Geabonneerd op '+histTopic,'ok');}
+    if(err){log('Subscribe history error: '+err.message,'err');}
+    else{log('Subscribed to '+histTopic,'ok');}
   });
 });
 
 client.on('close',function(){
-  log('MQTT verbinding gesloten','err');
+  log('MQTT connection closed','err');
   document.getElementById('status').textContent='Offline';
   document.getElementById('status').className='status err';
   document.getElementById('connDot').className='dot red';
@@ -315,7 +309,7 @@ client.on('close',function(){
 
 client.on('error',function(err){
   log('MQTT error: '+err.message,'err');
-  document.getElementById('status').textContent='Fout';
+  document.getElementById('status').textContent='Error';
   document.getElementById('status').className='status err';
 });
 
@@ -333,9 +327,9 @@ client.on('message',function(topic,msg){
     var d=JSON.parse(raw);
     var seq=d.seq!=null?d.seq:'-';
     var ageMs=d.t!=null?(Date.now()-d.t):'?';
-    log('Bericht #'+msgCount+' seq='+seq+' age='+ageMs+'ms raw='+raw.substring(0,180),'ok');
+    log('Message #'+msgCount+' seq='+seq+' age='+ageMs+'ms raw='+raw.substring(0,180),'ok');
     if(d.batV===undefined && d.pvV===undefined){
-      log('Status bericht, skip');
+      log('Status message, skip');
       return;
     }
 
@@ -358,10 +352,10 @@ client.on('message',function(topic,msg){
     // Handle commLost: device disconnected locally (no VE.Direct frames)
     if(d.commLost){
       var st=document.getElementById('status');
-      if(st){ st.textContent='GEEN DATA'; st.className='status warn'; }
+      if(st){ st.textContent='NO DATA'; st.className='status warn'; }
       var cd=document.getElementById('connDot');
       if(cd) cd.className='dot yellow';
-      updateDashboard({t:Date.now(),batV:0,pvV:0,pvW:0,batA:0,cs:0,csn:'GEEN DATA',err:0,deviceType:d.deviceType||'mppt',alarmBatLow:false,alarmLoadHigh:false,commLost:true,alarmSound:true,mppt:0,mppn:'Off',modelName:d.modelName||liveData.modelName});
+      updateDashboard({t:Date.now(),batV:0,pvV:0,pvW:0,batA:0,cs:0,csn:'NO DATA',err:0,deviceType:d.deviceType||'mppt',alarmBatLow:false,alarmLoadHigh:false,commLost:true,alarmSound:true,mppt:0,mppn:'Off',modelName:d.modelName||liveData.modelName});
       updateLastUpdate();
       return;
     }
@@ -374,7 +368,7 @@ client.on('message',function(topic,msg){
     updateDevice(d);
     updateLastUpdate();
   }catch(e){
-    log('FOUT bij bericht #'+msgCount+': '+e.message,'err');
+    log('ERROR processing message #'+msgCount+': '+e.message,'err');
     log('Raw: '+raw.substring(0,120),'err');
   }
 });
@@ -386,7 +380,7 @@ function updateLastUpdate(){
 
   // No data ever received (lastUpdateMs === 0)
   if(lastUpdateMs === 0){
-    el.textContent='Wachten op data...';
+    el.textContent='Waiting for data...';
     el.style.color='var(--muted)';
     return;
   }
@@ -398,13 +392,13 @@ function updateLastUpdate(){
     el.textContent='Live';
     el.style.color='var(--green)';
   } else if(secs < 60){
-    el.textContent='Laatste update: '+secs+'s geleden';
+    el.textContent='Last update: '+secs+'s ago';
     el.style.color='var(--muted)';
   } else if(secs < 3600){
-    el.textContent='Laatste update: '+Math.round(secs/60)+' min geleden';
+    el.textContent='Last update: '+Math.round(secs/60)+' min ago';
     el.style.color='var(--yellow)';
   } else {
-    el.textContent='Laatste update: '+Math.round(secs/3600)+' uur geleden';
+    el.textContent='Last update: '+Math.round(secs/3600)+'h ago';
     el.style.color='var(--red)';
   }
 
@@ -483,9 +477,9 @@ function updateDashboard(d){
   var pw=d.pvW!=null?d.pvW.toFixed(0):'--';
   setText('pvW', pw);
   
-  // Solar card label: AC OUTPUT for inverter, ZONNEPANEEL for MPPT
+  // Solar card label: AC OUTPUT for inverter, SOLAR for MPPT
   var solarLabel = document.querySelector('.meter-solar .meter-label');
-  if(solarLabel) solarLabel.textContent = isInv ? '🔌 AC OUTPUT' : '☀️ ZONNEPANEEL';
+  if(solarLabel) solarLabel.textContent = isInv ? '🔌 AC OUTPUT' : '☀️ SOLAR';
   
   if(isInv){
     setText('pvV', d.acOutV!=null?d.acOutV.toFixed(1):'--');
@@ -550,15 +544,15 @@ function updateDashboard(d){
   if(!isInv){
     var lb=document.getElementById('loadBadge');
     if(lb){
-      if(d.load===true||d.load===1){lb.innerHTML='<span style="color:#3ecf5e">&#9679; AAN</span> '+(d.loadA!=null&&d.loadA!==undefined?Number(d.loadA).toFixed(1)+'A':'');}
-      else if(d.load===false||d.load===0||d.load===undefined||d.load===null){lb.innerHTML='<span style="color:var(--muted)">&#9679; UIT</span>';}
+      if(d.load===true||d.load===1){lb.innerHTML='<span style="color:#3ecf5e">&#9679; ON</span> '+(d.loadA!=null&&d.loadA!==undefined?Number(d.loadA).toFixed(1)+'A':'');}
+      else if(d.load===false||d.load===0||d.load===undefined||d.load===null){lb.innerHTML='<span style="color:var(--muted)">&#9679; OFF</span>';}
       else{lb.innerHTML='<span style="color:var(--muted)">--</span>';}
     }
   }
   
   if(d.err&&d.err>0){
     var stE=document.getElementById('status');
-    if(stE){ stE.textContent=d.ern||'Fout'; stE.className='status err'; }
+    if(stE){ stE.textContent=d.ern||'Error'; stE.className='status err'; }
     var cdE=document.getElementById('connDot');
     if(cdE) cdE.className='dot red';
   }
@@ -642,13 +636,13 @@ function updateDashboard(d){
 
 function updateDevice(d){
   setText('devPid', d.pid||'--');
-  setText('devModel', d.modelName||'Onbekend model');
+  setText('devModel', d.modelName||'Unknown model');
   setText('devType', d.deviceType==='inverter'?'Inverter':'MPPT');
   setText('devMaxW', d.maxW!=null?(d.maxW+' '+(d.deviceType==='inverter'?'VA':'W')):'--');
   setText('devFw', d.fw||'--');
   setText('devSer', d.ser||'--');
   setText('devHsds', d.hsds!=null?d.hsds:'--');
-  setText('devUptime', d.uptime_h!=null?(d.uptime_h+' uur'):'--');
+  setText('devUptime', d.uptime_h!=null?(d.uptime_h+' h'):'--');
 }
 
 function switchTab(name){
@@ -661,28 +655,12 @@ function switchTab(name){
   if(name==='device')btns[2].classList.add('active');
   if(name==='settings')btns[3].classList.add('active');
 }
-function updateRvMqttCurrent(){
-  var el=document.getElementById('rvMqttCurrent');
-  if(el) el.textContent='Huidig: wss://'+rvBroker+':'+rvWssPort+'/'+rvTopic;
-}
-function forgetBlueLink(){
-  if(!confirm('Deze BlueLink ontkoppelen en alle opgeslagen instellingen wissen?')){ return; }
-  try{
-    localStorage.removeItem('bluelink.broker');
-    localStorage.removeItem('bluelink.topic');
-    localStorage.removeItem('bluelink.port');
-  }catch(e){}
-  showToast('Koppeling vergeten — herlaad om opnieuw te koppelen');
-  document.getElementById('status').textContent='Geen topic';
-  document.getElementById('status').className='status err';
-  document.getElementById('connDot').className='dot red';
-}
 function showToast(m,t){var el=document.getElementById('toast');el.textContent=m;el.className='toast show'+(t?' '+t:'');setTimeout(function(){el.classList.remove('show');},3000);}
 
 // Debug overlay hidden by default; add ?debug=1 to URL to show it.
 if(window.location.search.indexOf('debug=1')>=0){
   document.getElementById('debugLog').classList.add('show');
-  log('Debug mode actief');
+  log('Debug mode active');
 }
 
 // Register service worker for offline PWA support.
@@ -690,7 +668,7 @@ if('serviceWorker' in navigator){
   window.addEventListener('load', function(){
     navigator.serviceWorker.register('./sw.js')
       .then(function(registration){
-        log('Service Worker geregistreerd', 'ok');
+        log('Service Worker registered', 'ok');
         registration.addEventListener('updatefound', function(){
           var newWorker = registration.installing;
           if(!newWorker) return;
@@ -702,7 +680,7 @@ if('serviceWorker' in navigator){
         });
       })
       .catch(function(err){
-        log('Service Worker registratie mislukt: '+err.message, 'err');
+        log('Service Worker registration failed: '+err.message, 'err');
       });
   });
   var refreshing=false;
@@ -716,7 +694,7 @@ if('serviceWorker' in navigator){
 function showUpdatePrompt(newWorker){
   var toast=document.getElementById('toast');
   if(!toast) return;
-  toast.textContent='Update beschikbaar — tik om te herladen';
+    toast.textContent='Update available — tap to reload';
   toast.className='toast show warn';
   toast.onclick=function(){
     newWorker.postMessage({type:'SKIP_WAITING'});
@@ -731,7 +709,7 @@ function drawHistChart(){
   var W=box.clientWidth, H=box.clientHeight, dpr=window.devicePixelRatio||1;
   c.width=W*dpr; c.height=H*dpr; c.style.width=W+'px'; c.style.height=H+'px';
   var ctx=c.getContext('2d'); ctx.scale(dpr,dpr); ctx.clearRect(0,0,W,H);
-  if(!histPoints.length){ ctx.fillStyle='#5a7da0'; ctx.font='14px sans-serif'; ctx.textAlign='center'; ctx.fillText('Geen historie data',W/2,H/2); return; }
+  if(!histPoints.length){ ctx.fillStyle='#5a7da0'; ctx.font='14px sans-serif'; ctx.textAlign='center'; ctx.fillText('No history data',W/2,H/2); return; }
   var pad={t:18,r:44,b:24,l:40}, pw=W-pad.l-pad.r, ph=H-pad.t-pad.b, maxW=0, maxV=0, i;
   for(i=0;i<histPoints.length;i++){ if(histPoints[i].p>maxW) maxW=histPoints[i].p; var vv=histPoints[i].v/1000; if(vv>maxV) maxV=vv; }
   maxW=Math.ceil(maxW/20)*20+20||40; maxV=Math.ceil(maxV*10)/10+.5||12;
@@ -758,7 +736,7 @@ function drawDayChart(){
   var W=box.clientWidth, H=box.clientHeight, dpr=window.devicePixelRatio||1;
   c.width=W*dpr; c.height=H*dpr; c.style.width=W+'px'; c.style.height=H+'px';
   var ctx=c.getContext('2d'); ctx.scale(dpr,dpr); ctx.clearRect(0,0,W,H);
-  if(!dayTotals.length){ ctx.fillStyle='#5a7da0'; ctx.font='14px sans-serif'; ctx.textAlign='center'; ctx.fillText('Geen dagelijkse data',W/2,H/2); return; }
+  if(!dayTotals.length){ ctx.fillStyle='#5a7da0'; ctx.font='14px sans-serif'; ctx.textAlign='center'; ctx.fillText('No daily data',W/2,H/2); return; }
   var pad={t:14,r:8,b:28,l:8}, pw=W-pad.l-pad.r, ph=H-pad.t-pad.b, maxK=0, i;
   for(i=0;i<dayTotals.length;i++){ if(dayTotals[i].k>maxK) maxK=dayTotals[i].k; }
   maxK=Math.ceil(maxK*10)/10||0.5;
