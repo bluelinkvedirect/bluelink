@@ -1,7 +1,7 @@
 // BlueLink Remote PWA Service Worker
 // Cache shell assets for offline home-screen launch.
 
-const CACHE_NAME = 'bluelink-remote-v2';
+const CACHE_NAME = 'bluelink-remote-v3';
 
 const PRECACHE_URLS = [
   './bluelinkremote.html',
